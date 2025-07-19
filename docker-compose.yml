@@ -1,0 +1,18 @@
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "5001:5000"
+    volumes:
+      - ./backend:/app
+      - ./backend/cameras:/app/cameras
+      - ./backend/chroma_filter_spectra:/app/chroma_filter_spectra
+      - ./backend/dye_spectra_data:/app/dye_spectra_data
+    environment:
+      - FLASK_APP=app.py
+      - FLASK_ENV=production
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"

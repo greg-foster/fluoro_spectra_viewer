@@ -1,0 +1,35 @@
+[build]
+  # Build command for React frontend
+  command = "cd frontend && npm install && npm run build"
+  # Publish directory for the built frontend
+  publish = "frontend/build"
+  # Base directory
+  base = "."
+
+[build.environment]
+  NODE_VERSION = "18"
+  NPM_VERSION = "9"
+
+# Redirect all requests to index.html for React Router
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# API routes - these would need to be handled separately
+# Note: For full-stack deployment, the backend would typically need
+# to be deployed to a separate service like Heroku, Railway, or similar
+[[redirects]]
+  from = "/api/*"
+  to = "https://your-backend-url.herokuapp.com/api/:splat"
+  status = 200
+  force = true
+
+# Headers for security
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
