@@ -9,6 +9,7 @@
 [build.environment]
   NODE_VERSION = "18"
   NPM_VERSION = "9"
+  REACT_APP_API_BASE_URL = "https://erratic-hearing-production.up.railway.app"
 
 # Redirect all requests to index.html for React Router
 [[redirects]]
