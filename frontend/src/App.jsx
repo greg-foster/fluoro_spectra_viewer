@@ -227,7 +227,7 @@ export default function App() {
 
   return (
     <div className={`container${darkMode ? ' dark' : ''}`}>
-      <h1>Greg's Fluorescent Dye Spectra Viewer</h1>
+      <h1>Fluorescent Dye Spectra Viewer</h1>
 
       <DyeSelector
         selectedDyes={selectedDyes}
