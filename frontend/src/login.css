@@ -1,0 +1,331 @@
+/* Login Component Styles */
+.login-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+  background: #000000;
+  font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* SVG qPCR Curves Animation - Maximum Performance */
+.qpcr-curves {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  opacity: 0.6;
+  /* Maximum hardware acceleration */
+  will-change: auto;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  /* Optimize SVG rendering */
+  shape-rendering: optimizeSpeed;
+  /* Reduce repaints and reflows */
+  contain: layout style paint;
+  /* Disable pointer events for better performance */
+  pointer-events: none;
+}
+
+/* Grid lines styling - Simplified for performance */
+.grid-lines {
+  opacity: 0.15;
+  /* Optimize for performance */
+  shape-rendering: optimizeSpeed;
+  /* Reduce repaints */
+  contain: layout style paint;
+}
+
+/* qPCR Curve animations - Performance optimized with contain property */
+.qpcr-curve {
+  /* Use stroke-dasharray and stroke-dashoffset for continuous drawing effect */
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  /* Ensure continuous animation with no pauses */
+  animation-name: drawCurveSmooth;
+  animation-duration: 14.3s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-direction: normal;
+  animation-fill-mode: forwards;
+  animation-play-state: running;
+  /* Glow effect - simplified for better performance */
+  filter: drop-shadow(0 0 2px currentColor);
+  /* Increase stroke width for better visibility with glow */
+  stroke-width: 3px;
+  /* Performance optimizations */
+  will-change: stroke-dashoffset, opacity;
+  /* Optimize rendering for performance */
+  shape-rendering: optimizeSpeed;
+  /* Force GPU acceleration but with containment for better input performance */
+  transform: translateZ(0);
+  transform-style: flat;
+  backface-visibility: hidden;
+  /* Strict containment to isolate rendering and improve input responsiveness */
+  contain: strict;
+  /* Reduce animation impact on main thread */
+  pointer-events: none;
+}
+
+/* Specific glow effects for each curve with their respective colors */
+.fam-curve {
+  animation-delay: 0s;
+  filter: drop-shadow(0 0 3px rgba(0, 255, 0, 0.8)) drop-shadow(0 0 5px rgba(0, 255, 0, 0.4));
+}
+
+.hex-curve {
+  animation-delay: 0s;
+  filter: drop-shadow(0 0 3px rgba(255, 255, 0, 0.8)) drop-shadow(0 0 5px rgba(255, 255, 0, 0.4));
+}
+
+.texasred-curve {
+  animation-delay: 0s;
+  filter: drop-shadow(0 0 3px rgba(255, 0, 0, 0.8)) drop-shadow(0 0 5px rgba(255, 0, 0, 0.4));
+}
+
+.cy5-curve {
+  animation-delay: 0s;
+  filter: drop-shadow(0 0 3px rgba(0, 128, 255, 0.8)) drop-shadow(0 0 5px rgba(0, 128, 255, 0.4));
+}
+
+.rox-curve {
+  animation-delay: 0s;
+  filter: drop-shadow(0 0 3px rgba(255, 128, 0, 0.8)) drop-shadow(0 0 5px rgba(255, 128, 0, 0.4));
+}
+
+/* Continuous smooth animation with no discrete steps */
+@keyframes drawCurveSmooth {
+  0% {
+    stroke-dashoffset: 1000;
+    opacity: 0.5;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 1.0;
+  }
+}
+
+/* Pause all animations during typing for better input performance */
+.typing-active .qpcr-curve {
+  animation-play-state: paused !important;
+  transition: none !important;
+}
+
+/* Optimize input field during typing */
+.typing-active .login-form input {
+  transition: none !important;
+}
+
+.login-container::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image:
+    /* Grid lines to simulate qPCR plot */
+    linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(255,255,255,0.1) 1px, transparent 1px);
+  background-size: 50px 50px;
+  opacity: 0.2;
+  z-index: 1;
+}
+
+
+
+.login-container.dark {
+  background: #000000;
+}
+
+.login-container.dark::before {
+  opacity: 0.5;
+}
+
+.login-container.dark::after {
+  opacity: 0.3;
+}
+
+.login-box {
+  background: rgba(255, 255, 255, 0.98);
+  border: 2px solid rgba(227, 30, 36, 0.3);
+  border-radius: 12px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  padding: 40px;
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+  animation: slideUp 0.5s ease-out;
+  backdrop-filter: blur(10px);
+  position: relative;
+  z-index: 10;
+}
+
+.login-container.dark .login-box {
+  background: rgba(51, 51, 51, 0.95);
+  border: 2px solid rgba(227, 30, 36, 0.5);
+  color: #ffffff;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.login-header h1 {
+  color: #2c3e50;
+  margin-bottom: 8px;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.login-container.dark .login-header h1 {
+  color: #ecf0f1;
+}
+
+.login-header p {
+  color: #7f8c8d;
+  margin-bottom: 30px;
+  font-size: 14px;
+}
+
+.login-container.dark .login-header p {
+  color: #bdc3c7;
+}
+
+.login-form {
+  margin-bottom: 30px;
+}
+
+.input-group {
+  margin-bottom: 20px;
+  text-align: left;
+}
+
+.input-group label {
+  display: block;
+  margin-bottom: 8px;
+  color: #34495e;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.login-container.dark .input-group label {
+  color: #ecf0f1;
+}
+
+.input-group input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e0e6ed;
+  border-radius: 8px;
+  font-size: 16px;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+}
+
+.input-group input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.login-container.dark .input-group input {
+  background: #34495e;
+  border-color: #4a5f7a;
+  color: white;
+}
+
+.login-container.dark .input-group input:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+}
+
+.login-container.dark .input-group input::placeholder {
+  color: #95a5a6;
+}
+
+.error-message {
+  background: #e74c3c;
+  color: white;
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  animation: shake 0.5s ease-in-out;
+}
+
+@keyframes shake {
+  0%, 20%, 40%, 60%, 80% {
+    transform: translateX(0);
+  }
+  10%, 30%, 50%, 70%, 90% {
+    transform: translateX(-5px);
+  }
+}
+
+.login-button {
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, #000000 0%, #E31E24 100%);
+  color: white;
+  border: 2px solid #B71C1C;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.login-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(227, 30, 36, 0.4);
+  background: linear-gradient(135deg, #E31E24 0%, #B71C1C 100%);
+}
+
+.login-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.login-footer {
+  border-top: 1px solid #e0e6ed;
+  padding-top: 20px;
+  margin-top: 20px;
+}
+
+.login-container.dark .login-footer {
+  border-top-color: #4a5f7a;
+}
+
+.login-footer p {
+  color: #95a5a6;
+  font-size: 12px;
+  margin: 0;
+}
+
+/* Responsive design */
+@media (max-width: 480px) {
+  .login-box {
+    margin: 20px;
+    padding: 30px 20px;
+  }
+  
+  .login-header h1 {
+    font-size: 20px;
+  }
+}

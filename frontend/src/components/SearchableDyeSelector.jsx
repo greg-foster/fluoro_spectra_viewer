@@ -81,8 +81,18 @@ export default function SearchableDyeSelector({ selectedDyes, setSelectedDyes, s
   useEffect(() => {
     fetchDyeList().then(list => {
       console.log('[DEBUG] fetchDyeList returned:', list);
-      setDyeList(list);
-      setOptions(list.map(dye => ({ value: dye.id, label: dye.name })));
+      
+      // Sort the dye list alphabetically by name
+      const sortedList = Array.isArray(list) ? 
+        [...list].sort((a, b) => {
+          const nameA = (a.name || '').toLowerCase();
+          const nameB = (b.name || '').toLowerCase();
+          return nameA.localeCompare(nameB);
+        }) : [];
+      
+      setDyeList(sortedList);
+      setOptions(sortedList.map(dye => ({ value: dye.id, label: dye.name })));
+      
       if (!Array.isArray(list) || list.length === 0) {
         console.error('[DEBUG] Dye list is empty or not an array:', list);
       }
@@ -122,6 +132,7 @@ export default function SearchableDyeSelector({ selectedDyes, setSelectedDyes, s
         value={selectedDyes.map(dye => ({ value: dye.id, label: dye.name }))}
         onChange={handleChange}
         placeholder="Search or select dyes..."
+        title="Select fluorescent dyes to analyze. You can search by name and select multiple dyes for comparison and crosstalk analysis."
         menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
         styles={(() => {
           const dark = darkMode;

@@ -1,7 +1,7 @@
 import React, { useRef } from "react";
 import FilterSelector from "./FilterSelector";
 
-export default function FilterManager({ filters, setFilters, setFilterSpectra, darkMode }) {
+export default function FilterManager({ filters, setFilters, setFilterSpectra, darkMode, instrumentConfigs = [] }) {
   const fileInput = useRef();
 
   // Handle CSV/JSON filter upload
@@ -55,6 +55,23 @@ export default function FilterManager({ filters, setFilters, setFilterSpectra, d
     ];
   }
 
+  // Check if current filters match any instrument configuration (default or custom)
+  const isAnyConfigActive = React.useMemo(() => {
+    if (!filters.length || !instrumentConfigs.length) return false;
+    
+    // Check if current filters match filters from any configuration (both default and custom)
+    return instrumentConfigs.some(config => {
+      if (config.filters.length !== filters.length) return false;
+      
+      // Check if all filter IDs match (order-independent)
+      const configFilterIds = new Set(config.filters.map(f => f.id));
+      const currentFilterIds = new Set(filters.map(f => f.id));
+      
+      return configFilterIds.size === currentFilterIds.size && 
+             [...configFilterIds].every(id => currentFilterIds.has(id));
+    });
+  }, [filters, instrumentConfigs]);
+
   return (
     <div>
       <FilterSelector
@@ -62,6 +79,7 @@ export default function FilterManager({ filters, setFilters, setFilterSpectra, d
         setSelectedFilters={setFilters}
         setFilterSpectra={setFilterSpectra}
         darkMode={darkMode}
+        hideBackendFilters={isAnyConfigActive}
       />
 
     </div>

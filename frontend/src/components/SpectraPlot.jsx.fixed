@@ -61,8 +61,6 @@ export default function SpectraPlot({ selectedDyes, dyeSpectra, filterSpectra = 
   const [dragOffset, setDragOffset] = useState(0);
   const [originalCenterWavelength, setOriginalCenterWavelength] = useState(0);
   const [plotDimensions, setPlotDimensions] = useState({ width: 800, height: 450 });
-  const [xAxisRange, setXAxisRange] = useState([400, 700]); // Track current x-axis range
-  const [updateKey, setUpdateKey] = useState(0); // Force re-render key
   const plotRef = useRef(null);
   
   // Update plot dimensions when plot renders
@@ -72,8 +70,6 @@ export default function SpectraPlot({ selectedDyes, dyeSpectra, filterSpectra = 
       if (plotElement) {
         const rect = plotElement.getBoundingClientRect();
         setPlotDimensions({ width: rect.width, height: rect.height });
-        // Force a re-render of labels when dimensions change
-        setUpdateKey(prev => prev + 1);
       }
     };
     
@@ -89,12 +85,6 @@ export default function SpectraPlot({ selectedDyes, dyeSpectra, filterSpectra = 
     };
   }, [filters, isCustomConfig]);
   
-  // Use a debounced update for plot changes
-  useEffect(() => {
-    // Update labels when xAxisRange changes
-    // This is a safer approach than using MutationObserver
-  }, [xAxisRange]);
-  
   // Helper function to shift filter profile by wavelength offset
   const shiftFilterProfile = (profile, offset) => {
     if (!profile || !Array.isArray(profile)) return profile;
@@ -103,46 +93,25 @@ export default function SpectraPlot({ selectedDyes, dyeSpectra, filterSpectra = 
   
   // Calculate filter center wavelength for positioning drag handles
   const getFilterCenterWavelength = (filter) => {
-    if (!filter) return 500;
+    if (!filter || !filter.profile || !Array.isArray(filter.profile)) return 500;
     
-    // For filters with profile data (custom configs)
-    if (filter.profile && Array.isArray(filter.profile)) {
-      // Calculate weighted average center for more accurate visual center
-      let weightedSum = 0;
-      let totalWeight = 0;
-      
-      filter.profile.forEach(([wavelength, transmission]) => {
-        weightedSum += wavelength * transmission;
-        totalWeight += transmission;
-      });
-      
-      return totalWeight > 0 ? weightedSum / totalWeight : 500;
-    }
+    // Calculate weighted average center for more accurate visual center
+    let weightedSum = 0;
+    let totalWeight = 0;
     
-    // For filters without profile data (default configs)
-    // Try to get data from filterSpectra
-    const filterKey = filter.id || filter.name;
-    const filterData = filterSpectra[filterKey];
+    filter.profile.forEach(([wavelength, transmission]) => {
+      weightedSum += wavelength * transmission;
+      totalWeight += transmission;
+    });
     
-    if (filterData && Array.isArray(filterData)) {
-      let weightedSum = 0;
-      let totalWeight = 0;
-      
-      filterData.forEach(([wavelength, transmission]) => {
-        weightedSum += wavelength * transmission;
-        totalWeight += transmission;
-      });
-      
-      return totalWeight > 0 ? weightedSum / totalWeight : 500;
-    }
-    
-    return 500; // Default fallback
+    return totalWeight > 0 ? weightedSum / totalWeight : 500;
   };
   
   // Convert wavelength to pixel position on plot
   const wavelengthToPixel = (wavelength) => {
-    // Calculate the pixel position based on the plot dimensions and current x-axis range
-    const [minWavelength, maxWavelength] = xAxisRange;
+    // Calculate the pixel position based on the plot dimensions and wavelength range
+    const minWavelength = 400;
+    const maxWavelength = 700;
     const plotWidth = plotDimensions.width;
     
     // Account for plot margins (approximately 80px on left, 50px on right)
@@ -619,16 +588,6 @@ export default function SpectraPlot({ selectedDyes, dyeSpectra, filterSpectra = 
             modeBarButtonsToRemove: ['lasso2d', 'select2d'],
             displaylogo: false
           }}
-          onRelayout={(eventData) => {
-            // Update x-axis range when plot is zoomed or panned
-            if (eventData['xaxis.range[0]'] !== undefined && eventData['xaxis.range[1]'] !== undefined) {
-              setXAxisRange([eventData['xaxis.range[0]'], eventData['xaxis.range[1]']]);
-            } else if (eventData['xaxis.autorange'] === true) {
-              // Reset to default range when autorange is triggered
-              setXAxisRange([400, 700]);
-            }
-            // We don't need to force re-render here since xAxisRange change will trigger it
-          }}
           style={{ width: '100%' }}
           id={plotId}
         />
@@ -691,15 +650,8 @@ export default function SpectraPlot({ selectedDyes, dyeSpectra, filterSpectra = 
           );
         })}
         
-        {/* Filter name labels overlay - only for custom configurations */}
-        {isCustomConfig && orderedFilters.map(filter => {
-          if (!filter) return null;
-          
-          // Check if this filter has data either in filter.profile or in filterSpectra
-          const filterKey = filter.id || filter.name;
-          const hasFilterData = 
-            (filter.profile && Array.isArray(filter.profile)) || 
-            (filterSpectra[filterKey] && Array.isArray(filterSpectra[filterKey]));
+        {/* Filter name labels overlay */}
+        {orderedFilters.filter(filter => filter && filter.profile).map(filter => {
           // Find the original filter index to check visibility
           const originalIndex = filters.findIndex(f => f === filter);
           
@@ -723,22 +675,12 @@ export default function SpectraPlot({ selectedDyes, dyeSpectra, filterSpectra = 
           
           // Find the maximum transmission value for this filter to position label just above it
           let maxTransmission = 0;
-          let profileData;
-          
-          // For custom configs with profile data
-          if (filter.profile && Array.isArray(filter.profile)) {
-            profileData = (isDragging && draggedFilter?.id === filter.id) 
-              ? shiftFilterProfile(filter.profile, dragOffset)
-              : filter.profile;
-          } 
-          // For default configs using filterSpectra
-          else {
-            const filterKey = filter.id || filter.name;
-            profileData = filterSpectra[filterKey];
-          }
-          
-          if (profileData && Array.isArray(profileData)) {
-            maxTransmission = Math.max(...profileData.map(([wavelength, transmission]) => transmission));
+          const profileToUse = (isDragging && draggedFilter?.id === filter.id) 
+            ? shiftFilterProfile(filter.profile, dragOffset)
+            : filter.profile;
+            
+          if (profileToUse && Array.isArray(profileToUse)) {
+            maxTransmission = Math.max(...profileToUse.map(([wavelength, transmission]) => transmission));
           }
           
           // Convert transmission percentage to pixel position (approximate)
@@ -752,7 +694,7 @@ export default function SpectraPlot({ selectedDyes, dyeSpectra, filterSpectra = 
           
           return (
             <div
-              key={`label-${filter.id}-${updateKey}`}
+              key={`label-${filter.id}`}
               style={{
                 position: 'absolute',
                 left: `${labelX}px`,

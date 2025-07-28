@@ -691,8 +691,8 @@ export default function SpectraPlot({ selectedDyes, dyeSpectra, filterSpectra = 
           );
         })}
         
-        {/* Filter name labels overlay - only for custom configurations */}
-        {isCustomConfig && orderedFilters.map(filter => {
+        {/* Filter name labels overlay - key forces re-render */}
+        {orderedFilters.map(filter => {
           if (!filter) return null;
           
           // Check if this filter has data either in filter.profile or in filterSpectra

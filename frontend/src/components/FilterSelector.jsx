@@ -1,12 +1,19 @@
 import React, { useEffect, useState } from "react";
 import Select from "react-select";
 
-export default function FilterSelector({ selectedFilters, setSelectedFilters, setFilterSpectra, darkMode = false }) {
+export default function FilterSelector({ selectedFilters, setSelectedFilters, setFilterSpectra, darkMode = false, hideBackendFilters = false }) {
   const [filterList, setFilterList] = useState([]);
   const [options, setOptions] = useState([]);
 
   useEffect(() => {
     async function fetchFilters() {
+      // If backend filters should be hidden (when default config is active), don't fetch them
+      if (hideBackendFilters) {
+        setFilterList([]);
+        setOptions([]);
+        return;
+      }
+      
       try {
         // Fetch list of filter files from backend
         const resp = await fetch(`${process.env.REACT_APP_API_BASE_URL || ""}/api/filters`);
@@ -25,13 +32,21 @@ export default function FilterSelector({ selectedFilters, setSelectedFilters, se
       }
     }
     fetchFilters();
-  }, []);
+  }, [hideBackendFilters]);
 
   useEffect(() => {
     async function fetchSpectra() {
       const spectra = {};
       for (const filter of selectedFilters) {
         try {
+          // Skip backend API calls for instrument configuration filters that already have profile arrays
+          if (filter.profile && Array.isArray(filter.profile)) {
+            console.log('DEBUG FilterSelector: skipping backend fetch for instrument config filter', filter.id);
+            // Don't add to spectra object - SpectraPlot will use filter.profile directly
+            continue;
+          }
+          
+          // For backend filters, fetch from API
           const resp = await fetch(`${process.env.REACT_APP_API_BASE_URL || ""}/api/filters/${filter.id}`);
           let data = null;
           try {
@@ -73,12 +88,23 @@ export default function FilterSelector({ selectedFilters, setSelectedFilters, se
 
   return (
     <div>
-      <h2>Select Filters</h2>
+      <h2>Select Chroma Filters</h2>
+      {hideBackendFilters && (
+        <p style={{ 
+          color: darkMode ? '#888' : '#666', 
+          fontSize: '0.9em', 
+          fontStyle: 'italic',
+          marginBottom: '10px'
+        }}>
+          Additional filters are hidden when using instrument configurations. Filters are managed by the applied configuration.
+        </p>
+      )}
       <Select
         options={options}
         isMulti
         isClearable
-        value={selectedFilters.filter(f => f && f.id !== undefined).map(f => ({ value: f.id, label: f.name || f.id }))}
+        isDisabled={hideBackendFilters}
+        value={hideBackendFilters ? [] : selectedFilters.filter(f => f && f.id !== undefined).map(f => ({ value: f.id, label: f.name || f.id }))}
         onChange={handleChange}
         /* Warn if malformed filters are present */
         {...(selectedFilters.some(f => !f || f.id === undefined) ? (console.warn('Warning: Malformed filter in selectedFilters', selectedFilters), {}) : {})}
