@@ -1,0 +1,703 @@
+import React, { useRef, useEffect } from "react";
+import Plot from "react-plotly.js";
+import ExportButtons from "./ExportButtons";
+
+import { useState } from "react";
+
+// Converts a wavelength in nm (380-700) to an RGB color
+function wavelengthToRGB(wavelength) {
+  let r = 0, g = 0, b = 0;
+  if (wavelength >= 380 && wavelength < 440) {
+    r = -(wavelength - 440) / (440 - 380);
+    g = 0;
+    b = 1;
+  } else if (wavelength >= 440 && wavelength < 490) {
+    r = 0;
+    g = (wavelength - 440) / (490 - 440);
+    b = 1;
+  } else if (wavelength >= 490 && wavelength < 510) {
+    r = 0;
+    g = 1;
+    b = -(wavelength - 510) / (510 - 490);
+  } else if (wavelength >= 510 && wavelength < 580) {
+    r = (wavelength - 510) / (580 - 510);
+    g = 1;
+    b = 0;
+  } else if (wavelength >= 580 && wavelength < 645) {
+    r = 1;
+    g = -(wavelength - 645) / (645 - 580);
+    b = 0;
+  } else if (wavelength >= 645 && wavelength <= 700) {
+    r = 1;
+    g = 0;
+    b = 0;
+  }
+  // Intensity correction
+  let factor = 1;
+  if (wavelength >= 380 && wavelength < 420) {
+    factor = 0.3 + 0.7 * (wavelength - 380) / (420 - 380);
+  } else if (wavelength >= 700 && wavelength <= 780) {
+    factor = 0.3 + 0.7 * (780 - wavelength) / (780 - 700);
+  }
+  r = Math.round(r * 255 * factor);
+  g = Math.round(g * 255 * factor);
+  b = Math.round(b * 255 * factor);
+  return { r, g, b };
+}
+
+export default function SpectraPlot({ selectedDyes, dyeSpectra, filterSpectra = {}, filters = [], filterOrder = null, filterVisibility = {}, normalize = false, darkMode = false, normalizationDyeId = null, normalizedBrightness = {}, brightnessNormalizationOn = false, cameraQE = [], isCustomConfig = false, onFilterUpdate = null, onClearCache = null }) {
+  // DEBUG: Log cameraQE prop
+  if (typeof window !== 'undefined') {
+    console.log('SpectraPlot cameraQE:', cameraQE);
+  }
+  // Plot real spectra if available, else fallback to simulated
+  const [showExcitation, setShowExcitation] = useState(true);
+  const [showEmission, setShowEmission] = useState(true);
+  
+  // Drag-and-drop state
+  const [isDragging, setIsDragging] = useState(false);
+  const [draggedFilter, setDraggedFilter] = useState(null);
+  const [dragStartX, setDragStartX] = useState(0);
+  const [dragOffset, setDragOffset] = useState(0);
+  const [originalCenterWavelength, setOriginalCenterWavelength] = useState(0);
+  const [plotDimensions, setPlotDimensions] = useState({ width: 800, height: 450 });
+  const plotRef = useRef(null);
+  
+  // Update plot dimensions when plot renders
+  useEffect(() => {
+    const updateDimensions = () => {
+      const plotElement = plotRef.current?.querySelector('.js-plotly-plot');
+      if (plotElement) {
+        const rect = plotElement.getBoundingClientRect();
+        setPlotDimensions({ width: rect.width, height: rect.height });
+      }
+    };
+    
+    // Update dimensions after a short delay to ensure plot is rendered
+    const timer = setTimeout(updateDimensions, 500);
+    
+    // Also update on window resize
+    window.addEventListener('resize', updateDimensions);
+    
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', updateDimensions);
+    };
+  }, [filters, isCustomConfig]);
+  
+  // Helper function to shift filter profile by wavelength offset
+  const shiftFilterProfile = (profile, offset) => {
+    if (!profile || !Array.isArray(profile)) return profile;
+    return profile.map(([wavelength, transmission]) => [wavelength + offset, transmission]);
+  };
+  
+  // Calculate filter center wavelength for positioning drag handles
+  const getFilterCenterWavelength = (filter) => {
+    if (!filter.profile || !Array.isArray(filter.profile)) return 500;
+    
+    // Calculate weighted average center for more accurate visual center
+    let weightedSum = 0;
+    let totalWeight = 0;
+    
+    filter.profile.forEach(([wavelength, transmission]) => {
+      weightedSum += wavelength * transmission;
+      totalWeight += transmission;
+    });
+    
+    return totalWeight > 0 ? weightedSum / totalWeight : 500;
+  };
+  
+  // Convert wavelength to pixel position on plot
+  const wavelengthToPixel = (wavelength) => {
+    // Default plot range is 350-800nm
+    const minWavelength = 350;
+    const maxWavelength = 800;
+    const plotWidth = plotDimensions.width;
+    
+    // Calculate margins (left and right)
+    const leftMargin = 60;
+    const rightMargin = 60;
+    
+    // Calculate usable plot width
+    const usablePlotWidth = plotWidth - leftMargin - rightMargin;
+    
+    // Calculate pixel position
+    const pixelPosition = leftMargin + (wavelength - minWavelength) / (maxWavelength - minWavelength) * usablePlotWidth;
+    
+    // Clamp to plot boundaries
+    return Math.max(leftMargin, Math.min(plotWidth - rightMargin, pixelPosition));
+  };
+  
+  // Convert pixel position to wavelength
+  const pixelToWavelength = (pixel, plotWidth = 800) => {
+    // Default plot range is 350-800nm
+    const minWavelength = 350;
+    const maxWavelength = 800;
+    
+    // Calculate margins (left and right)
+    const leftMargin = 60;
+    const rightMargin = 60;
+    
+    // Calculate usable plot width
+    const usablePlotWidth = plotWidth - leftMargin - rightMargin;
+    
+    // Calculate wavelength from pixel position
+    return minWavelength + (pixel - leftMargin) / usablePlotWidth * (maxWavelength - minWavelength);
+  };
+  
+  // Handle drag start
+  const handleDragStart = (filter, event) => {
+    // Only allow dragging in custom config mode
+    if (!isCustomConfig || !onFilterUpdate) return;
+    
+    event.preventDefault();
+    
+    // Get current center wavelength
+    const centerWavelength = getFilterCenterWavelength(filter);
+    
+    setIsDragging(true);
+    setDraggedFilter(filter);
+    setDragStartX(event.clientX);
+    setOriginalCenterWavelength(centerWavelength);
+    setDragOffset(0);
+    
+    // Change cursor style
+    document.body.style.cursor = 'grabbing';
+  };
+  
+  // Handle drag move
+  const handleDragMove = (event) => {
+    if (!isDragging || !draggedFilter || !onFilterUpdate) return;
+    
+    // Calculate pixel delta
+    const deltaX = event.clientX - dragStartX;
+    
+    // Convert pixel delta to wavelength delta
+    const currentAxisRange = [350, 800]; // Default range
+    const plotWidth = plotDimensions.width - 120; // Account for margins
+    const wavelengthPerPixel = (currentAxisRange[1] - currentAxisRange[0]) / plotWidth;
+    const wavelengthDelta = deltaX * wavelengthPerPixel;
+    
+    // Update drag offset
+    setDragOffset(wavelengthDelta);
+    
+    // Create shifted filter profile
+    const shiftedProfile = shiftFilterProfile(draggedFilter.profile, wavelengthDelta);
+    
+    // Update filter with shifted profile (temporary update)
+    const updatedFilter = {
+      ...draggedFilter,
+      profile: shiftedProfile
+    };
+    
+    // Call onFilterUpdate with temporary flag
+    onFilterUpdate(updatedFilter, true);
+    
+    // Debug logging
+    if (typeof window !== 'undefined' && window.DEBUG_FILTER_DRAG) {
+      console.log('Slider tracking debug:', {
+        filterName: draggedFilter.name,
+        originalCenterWavelength,
+        dragOffset: wavelengthDelta,
+        calculatedCenterWavelength: getFilterCenterWavelength(updatedFilter),
+        currentAxisRange,
+        handleX: wavelengthToPixel(getFilterCenterWavelength(updatedFilter)),
+        plotDimensions
+      });
+    }
+  };
+  
+  // Handle drag end
+  const handleDragEnd = () => {
+    if (!isDragging || !draggedFilter || !onFilterUpdate) return;
+    
+    // Create shifted filter profile for final update
+    const shiftedProfile = shiftFilterProfile(draggedFilter.profile, dragOffset);
+    
+    // Update filter with shifted profile (permanent update)
+    const updatedFilter = {
+      ...draggedFilter,
+      profile: shiftedProfile
+    };
+    
+    // Call onFilterUpdate with permanent flag
+    onFilterUpdate(updatedFilter, false);
+    
+    // Reset drag state
+    setIsDragging(false);
+    setDraggedFilter(null);
+    setDragStartX(0);
+    setDragOffset(0);
+    
+    // Reset cursor style
+    document.body.style.cursor = '';
+  };
+  
+  // Add mouse event listeners
+  useEffect(() => {
+    if (!isDragging) return;
+    
+    const handleMouseMove = (event) => {
+      handleDragMove(event);
+    };
+    
+    const handleMouseUp = () => {
+      handleDragEnd();
+    };
+    
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, draggedFilter, dragStartX, dragOffset, originalCenterWavelength]);
+  
+  // Order filters according to filterOrder if provided
+  const orderedFilters = filterOrder && Array.isArray(filterOrder) 
+    ? filterOrder.map(i => filters[i])
+    : filters;
+
+  // Compute min/max for all Intensity (excitation/emission) values for y-axis alignment
+  let allY = [];
+
+  // Dye traces
+  const traces = selectedDyes.map((dye, i) => {
+    const spectra = dyeSpectra[dye.id];
+    let exc = null, em = null;
+    if (spectra && Array.isArray(spectra.excitation) && spectra.excitation.length > 0) {
+      exc = spectra.excitation;
+    }
+    if (spectra && Array.isArray(spectra.emission) && spectra.emission.length > 0) {
+      em = spectra.emission;
+    }
+    
+    let excTrace = null;
+    let emTrace = null;
+    
+    // Normalization label for brightness-normalized traces
+    let normLabel = '';
+    let brightnessNormFactor = 1;
+    
+    // If brightness normalization is on and we have a reference dye
+    if (brightnessNormalizationOn && normalizationDyeId) {
+      const dyeBrightness = normalizedBrightness[dye.id] || 0;
+      const normDyeBrightness = normalizedBrightness[normalizationDyeId] || 0;
+      
+      if (normDyeBrightness > 0 && dyeBrightness > 0) {
+        brightnessNormFactor = normDyeBrightness / dyeBrightness;
+        normLabel = ` (Norm: ${brightnessNormFactor.toFixed(2)})`;
+      }
+    }
+    // Remove old debug printouts
+
+    if (exc && exc.length > 0) {
+      let y_exc = exc.map(pair => pair[1]);
+      if (normalize && Math.max(...y_exc) > 0) {
+        y_exc = y_exc.map(y => y / Math.max(...y_exc));
+      }
+      allY.push(...y_exc);
+
+      excTrace = {
+        x: exc.map(pair => pair[0]),
+        y: y_exc,
+        mode: "lines",
+        name: `${dye.name} Excitation${normLabel}`,
+        line: { color: `hsl(${i * 50}, 70%, 45%)`, dash: "solid" }
+      };
+    }
+    if (em && em.length > 0) {
+      let y_em = em.map(pair => pair[1]);
+      if (normalize && Math.max(...y_em) > 0) {
+        y_em = y_em.map(y => y / Math.max(...y_em));
+      }
+      // Scale by normalized brightness if set and toggle is on
+      if (brightnessNormalizationOn && brightnessNormFactor !== 1) {
+        y_em = y_em.map(y => y * brightnessNormFactor);
+      }
+      
+      allY.push(...y_em);
+      
+      const rgb = wavelengthToRGB(500);
+      const rgba = `rgba(${rgb.r},${rgb.g},${rgb.b},1)`;
+      const fillrgba = `rgba(${rgb.r},${rgb.g},${rgb.b},0.18)`;
+      
+      emTrace = {
+        x: em.map(pair => pair[0]),
+        y: y_em,
+        mode: "lines",
+        name: `${dye.name} Emission${normLabel}`,
+        line: { color: rgba, dash: "dash" },
+        fill: "tozeroy",
+        fillcolor: fillrgba
+      };
+    }
+    // fallback to simulated if missing
+    if (!exc || !em) {
+      const simrgb = wavelengthToRGB(500);
+      const simrgba = `rgba(${simrgb.r},${simrgb.g},${simrgb.b},1)`;
+      const simfill = `rgba(${simrgb.r},${simrgb.g},${simrgb.b},0.18)`;
+      if (!exc) {
+        excTrace = {
+          x: [400, 450, 500, 550, 600],
+          y: [0, 0.5, 1, 0.5, 0],
+          mode: "lines",
+          name: `${dye.name} Excitation (sim)`,
+          line: { color: simrgba, dash: "solid" }
+        };
+      }
+      if (!em) {
+        emTrace = {
+          x: [500, 550, 600, 650, 700],
+          y: [0, 0.5, 1, 0.5, 0],
+          mode: "lines",
+          name: `${dye.name} Emission (sim)`,
+          line: { color: simrgba, dash: "dash" },
+          fill: "tozeroy",
+          fillcolor: simfill
+        };
+      }
+    }
+    return [excTrace, emTrace];
+  }).flat().filter(trace => {
+    if (!trace) return false;
+    if (trace.name.includes('Excitation') && !showExcitation) return false;
+    if (trace.name.includes('Emission') && !showEmission) return false;
+    return true;
+  });
+
+  // Filter transmission traces
+  // Extra debug logging for filters and filterSpectra
+  if (typeof window !== 'undefined') {
+    window._lastFilterSpectra = filterSpectra;
+    console.log('DEBUG filterSpectra', filterSpectra);
+    console.log('DEBUG filters', filters);
+    console.log('DEBUG filterVisibility', filterVisibility);
+  }
+  let missingFilterData = [];
+  const filterTraces = orderedFilters.map((filter, idx) => {
+    // Find the original filter index to check visibility
+    const originalIndex = filters.findIndex(f => f === filter);
+    
+    // Skip if filter is not visible
+    if (filterVisibility[originalIndex] === false) {
+      return null;
+    }
+    
+    // Support manual filters with a 'profile' array
+    if (filter.profile && Array.isArray(filter.profile)) {
+      // Apply drag offset if this filter is being dragged
+      const profileToUse = (isDragging && draggedFilter?.id === filter.id) 
+        ? shiftFilterProfile(filter.profile, dragOffset)
+        : filter.profile;
+      
+      // Calculate center wavelength for draggable indicator
+      const centerWavelength = getFilterCenterWavelength({ ...filter, profile: profileToUse });
+      
+      // Create trace from profile
+      return {
+        x: profileToUse.map(point => point[0]),
+        y: profileToUse.map(point => point[1]),
+        mode: "lines",
+        name: `${filter.name}${isCustomConfig ? ' (draggable)' : ''}`,
+        line: { 
+          color: filter.color || '#1976d2',
+          width: isCustomConfig ? 3 : 2,
+          dash: isDragging && draggedFilter?.id === filter.id ? 'dash' : 'solid'
+        },
+        yaxis: "y2"
+      };
+    }
+    
+    // Fall back to filterSpectra for non-manual filters
+    const filterKey = filter.id || filter.name;
+    const filterData = filterSpectra[filterKey];
+    
+    if (!filterData || !Array.isArray(filterData)) {
+      missingFilterData.push(filter.name || filterKey);
+      return null;
+    }
+    
+    return {
+      x: filterData.map(point => point[0]),
+      y: filterData.map(point => point[1]),
+      mode: "lines",
+      name: filter.name,
+      line: { color: filter.color || '#1976d2' },
+      yaxis: "y2"
+    };
+  }).filter(Boolean);
+
+  // Camera QE trace
+  let cameraQETrace = null;
+  if (Array.isArray(cameraQE) && cameraQE.length > 0 && cameraQE[0].x !== undefined && cameraQE[0].y !== undefined) {
+    cameraQETrace = {
+      x: cameraQE.map(pt => parseFloat(pt.x)),
+      y: cameraQE.map(pt => parseFloat(pt.y)),
+      mode: "lines",
+      name: "Camera QE (%)",
+      line: { color: "#00bfae", width: 3, dash: "dashdot" },
+      yaxis: "y2"
+    };
+  }
+
+  const plotId = "spectra-plot";
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <h2 style={{ margin: 0 }}>Spectra Plot</h2>
+        {onClearCache && (
+          <button
+            onClick={onClearCache}
+            style={{
+              padding: '6px 12px',
+              backgroundColor: '#d32f2f',
+              color: 'white',
+              border: 'none',
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontSize: '0.9em',
+              boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+            }}
+            title="Clear all cached data and reset to defaults"
+          >
+            🗑️ Clear Cache
+          </button>
+        )}
+      </div>
+      
+      {missingFilterData.length > 0 && (
+        <div style={{ color: 'red', fontWeight: 'bold', marginBottom: 8 }}>
+          Warning: No data found for filter(s): {missingFilterData.join(', ')}
+        </div>
+      )}
+      <div style={{ marginBottom: 12 }}>
+        <button
+          onClick={() => setShowExcitation(v => !v)}
+          style={{ marginRight: 8, background: showExcitation ? '#0288d1' : '#bdbdbd', color: 'white', border: 'none', borderRadius: 6, padding: '6px 14px', cursor: 'pointer' }}
+        >
+          {showExcitation ? 'Hide' : 'Show'} Excitation
+        </button>
+        <button
+          onClick={() => setShowEmission(v => !v)}
+          style={{ background: showEmission ? '#c2185b' : '#bdbdbd', color: 'white', border: 'none', borderRadius: 6, padding: '6px 14px', cursor: 'pointer' }}
+        >
+          {showEmission ? 'Hide' : 'Show'} Emission
+        </button>
+      </div>
+
+      {/* Interactive mode notification */}
+      {isCustomConfig && onFilterUpdate && (
+        <div style={{ 
+          backgroundColor: '#e3f2fd', 
+          padding: '8px 12px', 
+          marginBottom: 12, 
+          borderRadius: 4,
+          border: '1px solid #90caf9',
+          color: '#0d47a1',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <div>
+            <strong>Interactive Mode:</strong> Click and drag filter handles to adjust wavelength positions.
+            {isDragging && draggedFilter && (
+              <span style={{ marginLeft: 8 }}>
+                Moving: <strong>{draggedFilter.name}</strong> ({dragOffset > 0 ? '+' : ''}{dragOffset.toFixed(1)} nm)
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+      
+      {/* Plot container with draggable overlay handles */}
+      <div ref={plotRef} style={{ position: 'relative', width: '100%' }}>
+        <Plot
+          key={
+            'norm-' + (brightnessNormalizationOn ? 'on' : 'off') +
+            '-dye-' + (normalizationDyeId || 'none') +
+            '-map-' + JSON.stringify(normalizedBrightness) +
+            '-custom-' + (isCustomConfig ? 'true' : 'false')
+          }
+          divId={plotId}
+          data={[...traces, ...filterTraces, ...(cameraQETrace ? [cameraQETrace] : [])]}
+          layout={{
+            autosize: true,
+            height: 450,
+            xaxis: {
+              title: "Wavelength (nm)",
+              color: darkMode ? "#e0e0e0" : undefined,
+              gridcolor: darkMode ? "#333" : undefined,
+              zerolinecolor: darkMode ? "#333" : undefined
+            },
+            yaxis: {
+              title: "Intensity (a.u.)",
+              color: darkMode ? "#e0e0e0" : undefined,
+              gridcolor: darkMode ? "#333" : undefined,
+              zerolinecolor: darkMode ? "#333" : undefined,
+              anchor: "x",
+              rangemode: "tozero",
+              range: (allY.length > 0) ? [Math.min(...allY), Math.max(...allY)] : undefined
+            },
+            yaxis2: {
+              title: {
+                text: "Transmission / QE (%)",
+                standoff: 38 // Slightly closer for optimal spacing
+              },
+              overlaying: "y",
+              side: "right",
+              showgrid: false,
+              color: darkMode ? "#e0e0e0" : undefined,
+              gridcolor: darkMode ? "#333" : undefined,
+              zerolinecolor: darkMode ? "#333" : undefined,
+              range: (allY.length > 0) ? [Math.min(...allY), Math.max(...allY)] : undefined,
+              anchor: "x"
+            },
+            legend: { orientation: "h", yanchor: "bottom", y: 1.05, font: { color: darkMode ? "#fafafa" : undefined } },
+            margin: { l: 60, r: 60, t: 40, b: 50 },
+            plot_bgcolor: darkMode ? "#23272a" : "#f7f7f7",
+            paper_bgcolor: darkMode ? "#23272a" : "#f7f7f7",
+            font: { color: darkMode ? "#fafafa" : undefined }
+          }}
+          config={{
+            responsive: true,
+            displayModeBar: true,
+            modeBarButtonsToRemove: ['lasso2d', 'select2d'],
+            displaylogo: false
+          }}
+          style={{ width: '100%', height: '100%' }}
+        />
+        
+        {/* Draggable filter handles overlay */}
+        {isCustomConfig && onFilterUpdate && orderedFilters.map(filter => {
+          // Find the original filter index to check visibility
+          const originalIndex = filters.findIndex(f => f === filter);
+          
+          // Skip if filter is not visible
+          if (filterVisibility[originalIndex] === false) {
+            return null;
+          }
+          
+          // Calculate center wavelength from the actual filter profile (shifted if dragging)
+          let centerWavelength;
+          if (isDragging && draggedFilter?.id === filter.id) {
+            // For dragged filters, calculate center from the shifted profile
+            const shiftedProfile = shiftFilterProfile(filter.profile, dragOffset);
+            centerWavelength = getFilterCenterWavelength({ ...filter, profile: shiftedProfile });
+          } else {
+            // For non-dragged filters, use the original profile
+            centerWavelength = getFilterCenterWavelength(filter);
+          }
+          
+          const handleX = wavelengthToPixel(centerWavelength);
+          
+          // Position handle at the bottom of the plot area
+          const handleY = plotDimensions.height - 60; // 60px from bottom
+          
+          return (
+            <div
+              key={`handle-${filter.id}`}
+              style={{
+                position: 'absolute',
+                left: `${handleX}px`,
+                top: `${handleY}px`,
+                width: '16px',
+                height: '16px',
+                backgroundColor: filter.color || '#1976d2',
+                border: '2px solid white',
+                borderRadius: '50%',
+                cursor: isDragging && draggedFilter?.id === filter.id ? 'grabbing' : 'grab',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                transform: 'translate(-50%, -50%)',
+                zIndex: 1000,
+                opacity: isDragging && draggedFilter?.id === filter.id ? 0.8 : 1
+              }}
+              onMouseDown={(e) => handleDragStart(filter, e)}
+              title={`Drag to adjust ${filter.name} wavelength position`}
+            >
+              {/* Diamond shape indicator */}
+              <div style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%) rotate(45deg)',
+                width: '8px',
+                height: '8px',
+                backgroundColor: 'white'
+              }} />
+            </div>
+          );
+        })}
+        
+        {/* Filter name labels overlay */}
+        {orderedFilters.map(filter => {
+          // Find the original filter index to check visibility
+          const originalIndex = filters.findIndex(f => f === filter);
+          
+          // Skip if filter is not visible
+          if (filterVisibility[originalIndex] === false) {
+            return null;
+          }
+          
+          // Calculate center wavelength from the actual filter profile (shifted if dragging)
+          let centerWavelength;
+          if (isDragging && draggedFilter?.id === filter.id) {
+            // For dragged filters, calculate center from the shifted profile
+            const shiftedProfile = shiftFilterProfile(filter.profile, dragOffset);
+            centerWavelength = getFilterCenterWavelength({ ...filter, profile: shiftedProfile });
+          } else {
+            // For non-dragged filters, use the original profile
+            centerWavelength = getFilterCenterWavelength(filter);
+          }
+          
+          const labelX = wavelengthToPixel(centerWavelength);
+          
+          // Find the maximum transmission value for this filter to position label just above it
+          let maxTransmission = 0;
+          const profileToUse = (isDragging && draggedFilter?.id === filter.id) 
+            ? shiftFilterProfile(filter.profile, dragOffset)
+            : filter.profile;
+            
+          if (profileToUse && Array.isArray(profileToUse)) {
+            maxTransmission = Math.max(...profileToUse.map(([wavelength, transmission]) => transmission));
+          }
+          
+          // Convert transmission percentage to pixel position (approximate)
+          // Use a much more conservative approach for positioning closer to filters
+          const plotAreaHeight = plotDimensions.height - 140; // Account for margins
+          const transmissionPixelHeight = (maxTransmission / 100) * plotAreaHeight * 0.6; // Scale down more for closer positioning
+          const labelY = plotDimensions.height - 100 - transmissionPixelHeight - 5; // Just above the peak
+          
+          // Get first 5 characters of filter name
+          const labelText = filter.name ? filter.name.substring(0, 5) : 'Filter';
+          
+          return (
+            <div
+              key={`label-${filter.id}`}
+              style={{
+                position: 'absolute',
+                left: `${labelX}px`,
+                top: `${labelY}px`,
+                transform: 'translate(-50%, -50%)',
+                backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                color: 'white',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                fontSize: '11px',
+                fontWeight: 'bold',
+                zIndex: 999,
+                pointerEvents: 'none', // Don't interfere with plot interactions
+                fontFamily: 'monospace',
+                border: `1px solid ${filter.color || '#1976d2'}`,
+                boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
+              }}
+            >
+              {labelText}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
