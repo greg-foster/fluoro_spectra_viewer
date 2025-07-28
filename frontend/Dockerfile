@@ -5,7 +5,7 @@ COPY package.json package-lock.json* ./
 RUN npm install
 COPY . .
 ENV REACT_APP_API_BASE_URL=https://erratic-hearing-production.up.railway.app
-RUN npm run build
+RUN NODE_OPTIONS="--max-old-space-size=4096" npm run build
 
 # Serve with nginx
 FROM nginx:alpine

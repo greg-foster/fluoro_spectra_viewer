@@ -89,12 +89,6 @@ export default function SpectraPlot({ selectedDyes, dyeSpectra, filterSpectra = 
     };
   }, [filters, isCustomConfig]);
   
-  // Use a debounced update for plot changes
-  useEffect(() => {
-    // Update labels when xAxisRange changes
-    // This is a safer approach than using MutationObserver
-  }, [xAxisRange]);
-  
   // Helper function to shift filter profile by wavelength offset
   const shiftFilterProfile = (profile, offset) => {
     if (!profile || !Array.isArray(profile)) return profile;
@@ -516,6 +510,19 @@ export default function SpectraPlot({ selectedDyes, dyeSpectra, filterSpectra = 
     return [minX, maxX];
   };
   
+  // Initialize and update x-axis range when data changes
+  React.useEffect(() => {
+    const newDynamicRange = calculateDynamicXAxisRange();
+    // Only update if the range has significantly changed to avoid interfering with user zoom
+    const [currentMin, currentMax] = xAxisRange;
+    const [newMin, newMax] = newDynamicRange;
+    
+    // Update if this is the initial load or if the data range has changed significantly
+    if (Math.abs(currentMin - newMin) > 10 || Math.abs(currentMax - newMax) > 10) {
+      setXAxisRange(newDynamicRange);
+    }
+  }, [selectedDyes, dyeSpectra, filters, cameraQE]);
+  
   const dynamicXAxisRange = calculateDynamicXAxisRange();
   
   return (
@@ -626,7 +633,7 @@ export default function SpectraPlot({ selectedDyes, dyeSpectra, filterSpectra = 
             },
             xaxis: {
               title: "Wavelength (nm)",
-              range: dynamicXAxisRange,
+              range: xAxisRange,
               gridcolor: darkMode ? '#444' : '#eee',
               zerolinecolor: darkMode ? '#444' : '#eee',
               tickfont: {

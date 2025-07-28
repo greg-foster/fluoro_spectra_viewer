@@ -43,6 +43,15 @@ export default function DyeSpectraViewer({ darkMode, toggleDarkMode }) {
   
   // Filter visibility state for independent toggling
   const [filterVisibility, setFilterVisibility] = React.useState({});
+  
+  // Side-by-side comparison state
+  const [comparisonMode, setComparisonMode] = React.useState(false);
+  const [leftInstrumentConfig, setLeftInstrumentConfig] = React.useState(null);
+  const [rightInstrumentConfig, setRightInstrumentConfig] = React.useState(null);
+  const [leftFilters, setLeftFilters] = React.useState([]);
+  const [rightFilters, setRightFilters] = React.useState([]);
+  const [leftFilterVisibility, setLeftFilterVisibility] = React.useState({});
+  const [rightFilterVisibility, setRightFilterVisibility] = React.useState({});
 
   // ALL useEffect HOOKS MUST BE DECLARED BEFORE ANY CONDITIONAL LOGIC
   // Fetch camera list on mount
@@ -586,6 +595,62 @@ export default function DyeSpectraViewer({ darkMode, toggleDarkMode }) {
     }));
   };
   
+  // Helper functions for comparison mode
+  const handleComparisonModeToggle = () => {
+    setComparisonMode(!comparisonMode);
+    if (!comparisonMode) {
+      // Initialize comparison mode with current configuration
+      setLeftInstrumentConfig(null);
+      setRightInstrumentConfig(null);
+      setLeftFilters([]);
+      setRightFilters([]);
+      setLeftFilterVisibility({});
+      setRightFilterVisibility({});
+    }
+  };
+
+  const handleLeftInstrumentChange = (configName) => {
+    const config = instrumentConfigs.find(cfg => cfg.name === configName);
+    if (config) {
+      setLeftInstrumentConfig(config);
+      setLeftFilters(config.filters);
+      // Reset filter visibility for left side
+      const visibility = {};
+      config.filters.forEach((_, index) => {
+        visibility[index] = true;
+      });
+      setLeftFilterVisibility(visibility);
+    }
+  };
+
+  const handleRightInstrumentChange = (configName) => {
+    const config = instrumentConfigs.find(cfg => cfg.name === configName);
+    if (config) {
+      setRightInstrumentConfig(config);
+      setRightFilters(config.filters);
+      // Reset filter visibility for right side
+      const visibility = {};
+      config.filters.forEach((_, index) => {
+        visibility[index] = true;
+      });
+      setRightFilterVisibility(visibility);
+    }
+  };
+
+  const handleLeftFilterToggle = (filterIndex, isVisible) => {
+    setLeftFilterVisibility(prev => ({
+      ...prev,
+      [filterIndex]: isVisible
+    }));
+  };
+
+  const handleRightFilterToggle = (filterIndex, isVisible) => {
+    setRightFilterVisibility(prev => ({
+      ...prev,
+      [filterIndex]: isVisible
+    }));
+  };
+
   // Handle filter update from SpectraPlot drag operations
   const handleFilterUpdate = (updatedFilter, isTemporary) => {
     // Update the filter in the current filters array for real-time display
@@ -688,26 +753,200 @@ export default function DyeSpectraViewer({ darkMode, toggleDarkMode }) {
 
   return (
     <div className={`container${darkMode ? ' dark' : ''}`}>
-      {/* Spectra Plot and Crosstalk Table moved to top for better visibility */}
-      <SpectraPlot
-        selectedDyes={selectedDyes}
-        dyeSpectra={dyeSpectra}
-        filterSpectra={filterSpectra}
-        filters={filtersWithProfile}
-        filterOrder={filterOrder}
-        filterVisibility={filterVisibility}
-        darkMode={darkMode}
-        normalizationDyeId={normalizationDyeId}
-        normalizedBrightness={normalizedBrightness}
-        brightnessNormalizationOn={brightnessNormalizationOn}
-        cameraQE={includeCameraQEInCrosstalk ? cameraQE : []}
-        isCustomConfig={instrumentConfigs.some(config => 
-          config.category === 'custom' && 
-          JSON.stringify(config.filters.map(f => f.id).sort()) === JSON.stringify(filtersWithProfile.map(f => f.id).sort())
-        )}
-        onFilterUpdate={handleFilterUpdate}
-        onClearCache={handleClearCache}
-      />
+      {/* Comparison Mode Toggle */}
+      <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: darkMode ? '#2a2a2a' : '#f5f5f5', borderRadius: '8px', border: `1px solid ${darkMode ? '#444' : '#ddd'}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}>
+            <input
+              type="checkbox"
+              checked={comparisonMode}
+              onChange={handleComparisonModeToggle}
+            />
+            Side-by-Side Instrument Comparison
+          </label>
+          {comparisonMode && (
+            <span style={{ color: darkMode ? '#aaa' : '#666', fontSize: '0.9em' }}>
+              Compare two different instrument configurations with the same dyes
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Render plots based on comparison mode */}
+      {comparisonMode ? (
+        <div>
+          {/* Instrument Selection Controls */}
+          <div style={{ display: 'flex', gap: '20px', marginBottom: '16px', flexWrap: 'wrap' }}>
+            <div style={{ flex: '1', minWidth: '300px' }}>
+              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px' }}>Left Instrument:</label>
+              <select
+                value={leftInstrumentConfig?.name || ''}
+                onChange={(e) => handleLeftInstrumentChange(e.target.value)}
+                style={{ width: '100%', padding: '8px', borderRadius: '4px', border: `1px solid ${darkMode ? '#555' : '#ccc'}`, backgroundColor: darkMode ? '#333' : 'white', color: darkMode ? '#fff' : '#000' }}
+              >
+                <option value="">-- Select Left Instrument --</option>
+                {instrumentConfigs.map(config => (
+                  <option key={`left-${config.name}`} value={config.name}>
+                    {config.name} ({config.filters.length} filters)
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div style={{ flex: '1', minWidth: '300px' }}>
+              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px' }}>Right Instrument:</label>
+              <select
+                value={rightInstrumentConfig?.name || ''}
+                onChange={(e) => handleRightInstrumentChange(e.target.value)}
+                style={{ width: '100%', padding: '8px', borderRadius: '4px', border: `1px solid ${darkMode ? '#555' : '#ccc'}`, backgroundColor: darkMode ? '#333' : 'white', color: darkMode ? '#fff' : '#000' }}
+              >
+                <option value="">-- Select Right Instrument --</option>
+                {instrumentConfigs.map(config => (
+                  <option key={`right-${config.name}`} value={config.name}>
+                    {config.name} ({config.filters.length} filters)
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Side-by-Side Plots */}
+          <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+            {/* Left Plot */}
+            <div style={{ flex: '1', minWidth: '400px', border: `2px solid ${darkMode ? '#444' : '#ddd'}`, borderRadius: '8px', padding: '12px' }}>
+              <h3 style={{ margin: '0 0 12px 0', textAlign: 'center', color: darkMode ? '#fff' : '#000' }}>
+                {leftInstrumentConfig?.name || 'Left Instrument'}
+              </h3>
+              {leftInstrumentConfig ? (
+                <SpectraPlot
+                  selectedDyes={selectedDyes}
+                  dyeSpectra={dyeSpectra}
+                  filterSpectra={filterSpectra}
+                  filters={leftFilters.map(f => {
+                    const fs = filterSpectra[f.id];
+                    if (fs && fs.profile) return { ...f, profile: fs.profile };
+                    return f;
+                  }).filter(f => !!f)}
+                  filterOrder={leftFilters.map((_, i) => i)}
+                  filterVisibility={leftFilterVisibility}
+                  darkMode={darkMode}
+                  normalizationDyeId={normalizationDyeId}
+                  normalizedBrightness={normalizedBrightness}
+                  brightnessNormalizationOn={brightnessNormalizationOn}
+                  cameraQE={includeCameraQEInCrosstalk ? cameraQE : []}
+                  isCustomConfig={leftInstrumentConfig.category === 'custom'}
+                  onFilterUpdate={handleFilterUpdate}
+                  onClearCache={null}
+                />
+              ) : (
+                <div style={{ textAlign: 'center', padding: '40px', color: darkMode ? '#aaa' : '#666' }}>
+                  Select an instrument configuration above
+                </div>
+              )}
+            </div>
+
+            {/* Right Plot */}
+            <div style={{ flex: '1', minWidth: '400px', border: `2px solid ${darkMode ? '#444' : '#ddd'}`, borderRadius: '8px', padding: '12px' }}>
+              <h3 style={{ margin: '0 0 12px 0', textAlign: 'center', color: darkMode ? '#fff' : '#000' }}>
+                {rightInstrumentConfig?.name || 'Right Instrument'}
+              </h3>
+              {rightInstrumentConfig ? (
+                <SpectraPlot
+                  selectedDyes={selectedDyes}
+                  dyeSpectra={dyeSpectra}
+                  filterSpectra={filterSpectra}
+                  filters={rightFilters.map(f => {
+                    const fs = filterSpectra[f.id];
+                    if (fs && fs.profile) return { ...f, profile: fs.profile };
+                    return f;
+                  }).filter(f => !!f)}
+                  filterOrder={rightFilters.map((_, i) => i)}
+                  filterVisibility={rightFilterVisibility}
+                  darkMode={darkMode}
+                  normalizationDyeId={normalizationDyeId}
+                  normalizedBrightness={normalizedBrightness}
+                  brightnessNormalizationOn={brightnessNormalizationOn}
+                  cameraQE={includeCameraQEInCrosstalk ? cameraQE : []}
+                  isCustomConfig={rightInstrumentConfig.category === 'custom'}
+                  onFilterUpdate={handleFilterUpdate}
+                  onClearCache={null}
+                />
+              ) : (
+                <div style={{ textAlign: 'center', padding: '40px', color: darkMode ? '#aaa' : '#666' }}>
+                  Select an instrument configuration above
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Filter Toggle Controls for Comparison Mode */}
+          {(leftInstrumentConfig || rightInstrumentConfig) && (
+            <div style={{ marginTop: '16px', display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+              {/* Left Instrument Filter Controls */}
+              {leftInstrumentConfig && (
+                <div style={{ flex: '1', minWidth: '400px' }}>
+                  <h4 style={{ margin: '0 0 8px 0', textAlign: 'center', color: darkMode ? '#fff' : '#000' }}>
+                    {leftInstrumentConfig.name} Filter Controls
+                  </h4>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
+                    {leftFilters.map((filter, index) => (
+                      <label key={`left-filter-${index}`} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.9em' }}>
+                        <input
+                          type="checkbox"
+                          checked={leftFilterVisibility[index] !== false}
+                          onChange={(e) => handleLeftFilterToggle(index, e.target.checked)}
+                        />
+                        <span style={{ color: filter.color || '#666' }}>{filter.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Right Instrument Filter Controls */}
+              {rightInstrumentConfig && (
+                <div style={{ flex: '1', minWidth: '400px' }}>
+                  <h4 style={{ margin: '0 0 8px 0', textAlign: 'center', color: darkMode ? '#fff' : '#000' }}>
+                    {rightInstrumentConfig.name} Filter Controls
+                  </h4>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
+                    {rightFilters.map((filter, index) => (
+                      <label key={`right-filter-${index}`} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.9em' }}>
+                        <input
+                          type="checkbox"
+                          checked={rightFilterVisibility[index] !== false}
+                          onChange={(e) => handleRightFilterToggle(index, e.target.checked)}
+                        />
+                        <span style={{ color: filter.color || '#666' }}>{filter.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Single Plot Mode */
+        <SpectraPlot
+          selectedDyes={selectedDyes}
+          dyeSpectra={dyeSpectra}
+          filterSpectra={filterSpectra}
+          filters={filtersWithProfile}
+          filterOrder={filterOrder}
+          filterVisibility={filterVisibility}
+          darkMode={darkMode}
+          normalizationDyeId={normalizationDyeId}
+          normalizedBrightness={normalizedBrightness}
+          brightnessNormalizationOn={brightnessNormalizationOn}
+          cameraQE={includeCameraQEInCrosstalk ? cameraQE : []}
+          isCustomConfig={instrumentConfigs.some(config => 
+            config.category === 'custom' && 
+            JSON.stringify(config.filters.map(f => f.id).sort()) === JSON.stringify(filtersWithProfile.map(f => f.id).sort())
+          )}
+          onFilterUpdate={handleFilterUpdate}
+          onClearCache={handleClearCache}
+        />
+      )}
       <div style={{ margin: '18px 0 8px 0', display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
         {/* Brightness normalization controls */}
         {selectedDyes.length > 0 && (
