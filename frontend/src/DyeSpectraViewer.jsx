@@ -548,146 +548,21 @@ export default function DyeSpectraViewer({ darkMode, toggleDarkMode }) {
 
     if (confirmClear) {
       try {
-        // Clear all localStorage data
+        // Clear all localStorage data EXCEPT default configurations
         if (typeof window !== 'undefined') {
+          // Save default configurations before clearing
+          const defaultConfigs = instrumentConfigs.filter(config => config.category === 'default');
+          
+          // Clear all localStorage
           window.localStorage.clear();
+          
+          // Immediately restore default configurations to localStorage
+          window.localStorage.setItem('instrumentConfigs', JSON.stringify(defaultConfigs));
         }
 
-        // Recreate the initial configuration arrays
-        const initialDefaultConfigs = [
-          {
-            name: 'QuantStudio 5',
-            category: 'default',
-            filters: [
-              // Excitation filters (blue-tinted colors)
-              {
-                name: 'x1 Excitation (Blue)',
-                profile: Array.from({ length: 301 }, (_, i) => {
-                  const wavelength = 400 + i;
-                  // Excitation: 470 ± 15 nm
-                  return [wavelength, (wavelength >= 455 && wavelength <= 485) ? 100 : 0];
-                }),
-                color: '#1565C0', // Dark blue for excitation
-                filterType: 'excitation'
-              },
-              {
-                name: 'x2 Excitation (Green)',
-                profile: Array.from({ length: 301 }, (_, i) => {
-                  const wavelength = 400 + i;
-                  // Excitation: 520 ± 10 nm
-                  return [wavelength, (wavelength >= 510 && wavelength <= 530) ? 100 : 0];
-                }),
-                color: '#2E7D32', // Dark green for excitation
-                filterType: 'excitation'
-              },
-              {
-                name: 'x3 Excitation (Yellow)',
-                profile: Array.from({ length: 301 }, (_, i) => {
-                  const wavelength = 400 + i;
-                  // Excitation: 550 ± 10 nm
-                  return [wavelength, (wavelength >= 540 && wavelength <= 560) ? 100 : 0];
-                }),
-                color: '#F57F17', // Dark yellow for excitation
-                filterType: 'excitation'
-              },
-              {
-                name: 'x4 Excitation (Orange)',
-                profile: Array.from({ length: 301 }, (_, i) => {
-                  const wavelength = 400 + i;
-                  // Excitation: 580 ± 10 nm
-                  return [wavelength, (wavelength >= 570 && wavelength <= 590) ? 100 : 0];
-                }),
-                color: '#E65100', // Dark orange for excitation
-                filterType: 'excitation'
-              },
-              {
-                name: 'x5 Excitation (Red)',
-                profile: Array.from({ length: 301 }, (_, i) => {
-                  const wavelength = 400 + i;
-                  // Excitation: 640 ± 10 nm
-                  return [wavelength, (wavelength >= 630 && wavelength <= 650) ? 100 : 0];
-                }),
-                color: '#B71C1C', // Dark red for excitation
-                filterType: 'excitation'
-              },
-              {
-                name: 'x6 Excitation (Deep-Red)',
-                profile: Array.from({ length: 301 }, (_, i) => {
-                  const wavelength = 400 + i;
-                  // Excitation: 662 ± 10 nm
-                  return [wavelength, (wavelength >= 652 && wavelength <= 672) ? 100 : 0];
-                }),
-                color: '#4A148C', // Dark purple for excitation
-                filterType: 'excitation'
-              },
-              // Emission filters (lighter, warmer colors)
-              {
-                name: 'm1 Emission (Blue)',
-                profile: Array.from({ length: 301 }, (_, i) => {
-                  const wavelength = 400 + i;
-                  // Emission: 520 ± 15 nm
-                  return [wavelength, (wavelength >= 505 && wavelength <= 535) ? 100 : 0];
-                }),
-                color: '#42A5F5', // Light blue for emission
-                filterType: 'emission'
-              },
-              {
-                name: 'm2 Emission (Green)',
-                profile: Array.from({ length: 301 }, (_, i) => {
-                  const wavelength = 400 + i;
-                  // Emission: 558 ± 12 nm
-                  return [wavelength, (wavelength >= 546 && wavelength <= 570) ? 100 : 0];
-                }),
-                color: '#66BB6A', // Light green for emission
-                filterType: 'emission'
-              },
-              {
-                name: 'm3 Emission (Yellow)',
-                profile: Array.from({ length: 301 }, (_, i) => {
-                  const wavelength = 400 + i;
-                  // Emission: 587 ± 10 nm
-                  return [wavelength, (wavelength >= 577 && wavelength <= 597) ? 100 : 0];
-                }),
-                color: '#FFEB3B', // Light yellow for emission
-                filterType: 'emission'
-              },
-              {
-                name: 'm4 Emission (Orange)',
-                profile: Array.from({ length: 301 }, (_, i) => {
-                  const wavelength = 400 + i;
-                  // Emission: 623 ± 14 nm
-                  return [wavelength, (wavelength >= 609 && wavelength <= 637) ? 100 : 0];
-                }),
-                color: '#FF9800', // Light orange for emission
-                filterType: 'emission'
-              },
-              {
-                name: 'm5 Emission (Red)',
-                profile: Array.from({ length: 301 }, (_, i) => {
-                  const wavelength = 400 + i;
-                  // Emission: 682 ± 14 nm
-                  return [wavelength, (wavelength >= 668 && wavelength <= 696) ? 100 : 0];
-                }),
-                color: '#EF5350', // Light red for emission
-                filterType: 'emission'
-              },
-              {
-                name: 'm6 Emission (Deep-Red)',
-                profile: Array.from({ length: 401 }, (_, i) => {
-                  const wavelength = 400 + i;
-                  // Emission: 711 ± 12 nm
-                  return [wavelength, (wavelength >= 699 && wavelength <= 723) ? 100 : 0];
-                }),
-                color: '#AB47BC', // Light purple for emission
-                filterType: 'emission'
-              }
-            ]
-          }
-        ];
-
-        // Reset all state to initial values, but preserve all default configurations
-        const defaultConfigs = instrumentConfigs.filter(config => config.category === 'default');
-        setInstrumentConfigs(defaultConfigs);
+        // Reset state to only include default configurations
+        const defaultConfigsOnly = instrumentConfigs.filter(config => config.category === 'default');
+        setInstrumentConfigs(defaultConfigsOnly);
         setSelectedDyes([]);
         setFilters([]);
         setNormalizationDyeId(null);

@@ -479,6 +479,45 @@ export default function SpectraPlot({ selectedDyes, dyeSpectra, filterSpectra = 
   
   const plotId = "spectra-plot";
   
+  // Calculate dynamic x-axis range based on all data
+  const calculateDynamicXAxisRange = () => {
+    let minX = 400; // Default minimum
+    let maxX = 700; // Default maximum
+    
+    // Collect all x-values from all traces
+    const allTraces = [
+      ...dyeTraces.flat(),
+      ...filterTraces,
+      cameraQETrace
+    ].filter(Boolean);
+    
+    if (allTraces.length > 0) {
+      const allXValues = [];
+      
+      allTraces.forEach(trace => {
+        if (trace.x && Array.isArray(trace.x)) {
+          allXValues.push(...trace.x);
+        }
+      });
+      
+      if (allXValues.length > 0) {
+        const dataMinX = Math.min(...allXValues);
+        const dataMaxX = Math.max(...allXValues);
+        
+        // Add some padding (5% on each side)
+        const range = dataMaxX - dataMinX;
+        const padding = Math.max(10, range * 0.05); // At least 10nm padding
+        
+        minX = Math.max(300, dataMinX - padding); // Don't go below 300nm
+        maxX = Math.min(800, dataMaxX + padding); // Don't go above 800nm
+      }
+    }
+    
+    return [minX, maxX];
+  };
+  
+  const dynamicXAxisRange = calculateDynamicXAxisRange();
+  
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -587,7 +626,7 @@ export default function SpectraPlot({ selectedDyes, dyeSpectra, filterSpectra = 
             },
             xaxis: {
               title: "Wavelength (nm)",
-              range: [400, 700],
+              range: dynamicXAxisRange,
               gridcolor: darkMode ? '#444' : '#eee',
               zerolinecolor: darkMode ? '#444' : '#eee',
               tickfont: {
