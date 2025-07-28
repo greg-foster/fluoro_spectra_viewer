@@ -310,12 +310,19 @@ export default function SpectraPlot({ selectedDyes, dyeSpectra, filterSpectra = 
       }
       allY.push(...y_exc);
       
+      // Find peak excitation wavelength for proper color
+      const maxIntensity = Math.max(...y_exc);
+      const peakIndex = y_exc.findIndex(intensity => intensity === maxIntensity);
+      const peakWavelength = exc[peakIndex] ? exc[peakIndex][0] : 450;
+      const excRgb = wavelengthToRGB(peakWavelength);
+      const excColor = `rgba(${excRgb.r},${excRgb.g},${excRgb.b},1)`;
+      
       excTrace = {
         x: exc.map(pair => pair[0]),
         y: y_exc,
         mode: "lines",
         name: `${dye.name} Excitation${normLabel}`,
-        line: { color: `hsl(${i * 50}, 70%, 45%)`, dash: "solid" }
+        line: { color: excColor, dash: "solid" }
       };
     }
     
@@ -332,46 +339,55 @@ export default function SpectraPlot({ selectedDyes, dyeSpectra, filterSpectra = 
       
       allY.push(...y_em);
       
-      const rgb = wavelengthToRGB(500);
-      const rgba = `rgba(${rgb.r},${rgb.g},${rgb.b},1)`;
-      const fillrgba = `rgba(${rgb.r},${rgb.g},${rgb.b},0.18)`;
+      // Find peak emission wavelength for proper color
+      const maxEmIntensity = Math.max(...y_em);
+      const peakEmIndex = y_em.findIndex(intensity => intensity === maxEmIntensity);
+      const peakEmWavelength = em[peakEmIndex] ? em[peakEmIndex][0] : 550;
+      const emRgb = wavelengthToRGB(peakEmWavelength);
+      const emColor = `rgba(${emRgb.r},${emRgb.g},${emRgb.b},1)`;
+      const emFillColor = `rgba(${emRgb.r},${emRgb.g},${emRgb.b},0.18)`;
       
       emTrace = {
         x: em.map(pair => pair[0]),
         y: y_em,
         mode: "lines",
         name: `${dye.name} Emission${normLabel}`,
-        line: { color: rgba, dash: "dash" },
+        line: { color: emColor, dash: "dash" },
         fill: "tozeroy",
-        fillcolor: fillrgba
+        fillcolor: emFillColor
       };
     }
     
     // fallback to simulated if missing
     if (!exc || !em) {
-      const simrgb = wavelengthToRGB(500);
-      const simrgba = `rgba(${simrgb.r},${simrgb.g},${simrgb.b},1)`;
-      const simfill = `rgba(${simrgb.r},${simrgb.g},${simrgb.b},0.18)`;
-      
       if (!exc) {
+        // Use blue-green for simulated excitation (around 480nm)
+        const excSimRgb = wavelengthToRGB(480);
+        const excSimColor = `rgba(${excSimRgb.r},${excSimRgb.g},${excSimRgb.b},1)`;
+        
         excTrace = {
           x: [400, 450, 500, 550, 600],
           y: [0, 0.5, 1, 0.5, 0],
           mode: "lines",
           name: `${dye.name} Excitation (sim)`,
-          line: { color: simrgba, dash: "solid" }
+          line: { color: excSimColor, dash: "solid" }
         };
       }
       
       if (!em) {
+        // Use yellow-green for simulated emission (around 570nm)
+        const emSimRgb = wavelengthToRGB(570);
+        const emSimColor = `rgba(${emSimRgb.r},${emSimRgb.g},${emSimRgb.b},1)`;
+        const emSimFill = `rgba(${emSimRgb.r},${emSimRgb.g},${emSimRgb.b},0.18)`;
+        
         emTrace = {
           x: [500, 550, 600, 650, 700],
           y: [0, 0.5, 1, 0.5, 0],
           mode: "lines",
           name: `${dye.name} Emission (sim)`,
-          line: { color: simrgba, dash: "dash" },
+          line: { color: emSimColor, dash: "dash" },
           fill: "tozeroy",
-          fillcolor: simfill
+          fillcolor: emSimFill
         };
       }
     }
