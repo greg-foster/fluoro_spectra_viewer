@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Homepage from './Homepage';
 import ToolLayout from './ToolLayout';
 import DyeSpectraViewer from '../DyeSpectraViewer'; // We'll rename App.jsx to this
+import EDSParser from './EDSParser';
 
 /**
  * AppRouter - Main routing component for the portal
@@ -57,6 +58,23 @@ export default function AppRouter({ onLogout }) {
               <DyeSpectraViewer 
                 darkMode={darkMode}
                 toggleDarkMode={toggleDarkMode}
+              />
+            </ToolLayout>
+          } 
+        />
+        
+        {/* EDS Parser Tool */}
+        <Route 
+          path="/tools/eds-parser" 
+          element={
+            <ToolLayout 
+              toolName="EDS File Parser"
+              onLogout={onLogout}
+              darkMode={darkMode}
+              toggleDarkMode={toggleDarkMode}
+            >
+              <EDSParser 
+                darkMode={darkMode}
               />
             </ToolLayout>
           } 

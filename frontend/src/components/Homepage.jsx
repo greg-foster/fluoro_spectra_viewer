@@ -20,6 +20,14 @@ export default function Homepage({ onLogout, darkMode, toggleDarkMode }) {
       path: '/tools/dye-spectra-viewer'
     },
     {
+      id: 'eds-parser',
+      name: 'EDS File Parser',
+      description: 'Comprehensive analysis tool for Thermo Fisher EDS qPCR experiment files with memory profiling',
+      icon: '🧬',
+      color: '#667eea',
+      path: '/tools/eds-parser'
+    },
+    {
       id: 'dpcr-calculator',
       name: 'dPCR Resolution & Capability Calculator',
       description: 'Calculate digital PCR resolution and capability parameters for optimal assay design (Coming Soon)',
