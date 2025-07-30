@@ -1,6 +1,6 @@
 [build]
-  # Build command for React frontend
-  command = "cd frontend && npm install && npm run build"
+  # Build command for React frontend with increased memory limit
+  command = "cd frontend && npm install && NODE_OPTIONS=\"--max_old_space_size=4096\" npm run build"
   # Publish directory for the built frontend
   publish = "frontend/build"
   # Base directory
